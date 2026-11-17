@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pixless</title>
+<style>
+:root{--bg:#f3f2ef;--panel:#fff;--ink:#1b1b1d;--mute:#6c6c72;--line:#dcdbd6;--btn:#1b1b1d;--btnink:#fff;--frame:#1b1b1d;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121214;--panel:#1c1c1f;--ink:#f1f1f2;--mute:#9a9aa2;--line:#2e2e33;--btn:#f1f1f2;--btnink:#121214;--frame:#000}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.app{max-width:1000px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-template-columns:1fr}
+@media(min-width:820px){.app{grid-template-columns:1fr 320px;align-items:start;padding:28px}}
+header{grid-column:1/-1;display:flex;align-items:baseline;gap:10px}
+h1{font-size:22px;margin:0;letter-spacing:-.02em}
+header span{color:var(--mute);font-size:13px}
+.stage{background:var(--frame);border-radius:14px;padding:10px;position:relative}
+.screen{position:relative;min-height:300px;display:grid;place-items:center;border-radius:6px;overflow:hidden;background:var(--c0,#222)}
+canvas,.orig{display:block;max-width:100%;max-height:72vh;width:auto;height:auto;image-rendering:pixelated}
+.orig{position:absolute;inset:0;margin:auto;image-rendering:auto;opacity:0;pointer-events:none;object-fit:contain;width:100%;height:100%}
+.orig.on{opacity:1}
+[hidden]{display:none!important}
+.empty{padding:40px 20px;text-align:center;color:#fff;display:grid;gap:12px;justify-items:center}
+.empty p{margin:0;opacity:.8}
+.bar{display:flex;gap:8px;margin-top:10px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:9px;padding:10px 14px;min-height:42px}
+button.main{background:var(--btn);color:var(--btnink);border-color:var(--btn);font-weight:600}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.bar .main{flex:1;background:#f1f1f2;color:#1b1b1d;border-color:#f1f1f2}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:18px}
+.row{display:grid;gap:8px}
+.lab{display:flex;justify-content:space-between;font-weight:600;font-size:13px}
+.lab span{color:var(--mute);font-weight:400}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:9px 4px;min-height:38px;font-size:13px;background:transparent}
+.seg button[aria-pressed=true]{background:var(--btn);color:var(--btnink)}
+input[type=range]{width:100%;accent-color:var(--ink);height:28px;margin:0}
+.pals{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.pal{padding:0;height:44px;display:flex;overflow:hidden;border-radius:9px;border:2px solid var(--line)}
+.pal[aria-pressed=true]{border-color:var(--ink)}
+.pal i{flex:1}
+.link{background:none;border:0;padding:4px 0;min-height:0;color:var(--mute);text-decoration:underline;justify-self:start;font-size:13px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>Pixless</h1><span>Photo to pixel art, camera style</span></header>
+
+  <main>
+    <div class="stage">
+      <div class="screen" id="screen">
+        <div class="empty" id="empty">
+          <p>Drop a photo here, or pick one.</p>
+          <button class="main" id="pick">Choose photo</button>
+        </div>
+        <canvas id="cv" hidden></canvas>
+        <img class="orig" id="orig" alt="Original photo">
+      </div>
+      <div class="bar">
+        <button id="hold" disabled>Hold to compare</button>
+        <button class="main" id="save" disabled>Save PNG</button>
+        <button id="save1" disabled title="Small file, one pixel per image pixel">1×</button>
+      </div>
+    </div>
+  </main>
+
+  <aside class="panel">
+    <div class="row">
+      <div class="lab">Detail <span id="vres">256 px</span></div>
+      <div class="seg" id="res"></div>
+    </div>
+    <div class="row">
+      <div class="lab">Dither style</div>
+      <div class="seg" id="dm"></div>
+    </div>
+    <div class="row">
+      <div class="lab">Dither amount <span id="vd">6</span></div>
+      <input type="range" id="dit" min="0" max="8" value="6">
+    </div>
+    <div class="row">
+      <div class="lab">Contrast <span id="vc">0</span></div>
+      <input type="range" id="con" min="-50" max="50" value="0">
+    </div>
+    <div class="row">
+      <div class="lab">Brightness <span id="vb">0</span></div>
+      <input type="range" id="bri" min="-50" max="50" value="0">
+    </div>
+    <div class="row">
+      <div class="lab">Colours</div>
+      <div class="pals" id="pals"></div>
+      <button class="link" id="cust">Use my own colours</button>
+    </div>
+    <button id="reset">Reset</button>
+  </aside>
+</div>
+<input type="file" id="file" accept="image/*" hidden>
+<input type="file" id="pfile" accept=".txt,.hex,.pal,text/plain" hidden>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+/* Real palette matching: every pixel snaps to its closest palette colour (any number of colours). */
+const PALS={
+  "Mk I":["#543344","#4a4e5e","#63787d","#8ea092","#c9cca1","#fbfbf5","#843c48","#ae6648","#c0a266"],
+  "Daylight":["#181425","#3d2732","#784742","#1f4541","#3a4763","#5b6985","#9398a9","#c1ccdc","#eddabb","#ffffff"],
+  "Sepia":["#24212a","#5a3a2a","#76858a","#8a6a4a","#b6aa91","#eee9cb"],
+  "Green":["#0f380f","#306230","#8bac0f","#9bbc0f"],
+  "Mono":["#000000","#555555","#aaaaaa","#ffffff"],
+  "Amber":["#1a0f00","#6b3a05","#d9821a","#ffd98a"],
+  "Rose":["#6d3b47","#b86b77","#e8a87c","#fbeec1"],
+  "Ice":["#1d3557","#457b9d","#a8dadc","#f1faee"],
+  "Violet":["#4b3f72","#7c6dae","#c2b8ff","#f6e7cb"],
+  "Neon":["#0a0a0a","#ff00e5","#00f5ff","#ffd300"],
+  "Red":["#000000","#660708","#e5383b","#ffb3b3"]
+};
+const RES=[128,192,256,384];
+const MODES=[["bayer","Ordered"],["fs","Smooth"]];
+const DEF={res:256,mode:"bayer",dith:6,con:0,bri:0,pal:"Mk I"};
+const S=Object.assign({},DEF,{custom:null,img:null,url:null});
+
+const hex=h=>{h=h.replace("#","");if(h.length===3)h=[...h].map(c=>c+c).join("");return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]};
+const colours=()=>S.pal==="Custom"&&S.custom?S.custom:PALS[S.pal].map(hex);
+
+const BAYER=(()=>{let m=[[0]];for(let n=1;n<4;n*=2){const s=m.length,o=[];for(let y=0;y<s*2;y++){o.push([]);for(let x=0;x<s*2;x++){const b=m[y%s][x%s]*4;const q=(y<s?0:1)*2+(x<s?0:1);o[y].push(b+[0,2,3,1][q])}}m=o}
+  return m.map(r=>r.map(v=>(v+.5)/16-.5))})();
+
+function downscale(img,w,h){
+  let c=document.createElement("canvas"),x=c.getContext("2d");
+  c.width=img.naturalWidth;c.height=img.naturalHeight;x.drawImage(img,0,0);
+  while(c.width/2>=w&&c.height/2>=h){
+    const n=document.createElement("canvas");n.width=Math.floor(c.width/2);n.height=Math.floor(c.height/2);
+    const nx=n.getContext("2d");nx.imageSmoothingQuality="high";nx.drawImage(c,0,0,n.width,n.height);c=n;
+  }
+  const f=document.createElement("canvas");f.width=w;f.height=h;
+  const fx=f.getContext("2d",{willReadFrequently:true});fx.imageSmoothingQuality="high";fx.drawImage(c,0,0,w,h);
+  return fx.getImageData(0,0,w,h);
+}
+
+const LW=1.4;
+function lab(r,g,b){
+  const f=v=>{v/=255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)};
+  r=f(Math.min(255,Math.max(0,r)));g=f(Math.min(255,Math.max(0,g)));b=f(Math.min(255,Math.max(0,b)));
+  const l=Math.cbrt(.4122214708*r+.5363325363*g+.0514459929*b),m=Math.cbrt(.2119034982*r+.6806995451*g+.1073969566*b),s=Math.cbrt(.0883024619*r+.2817188376*g+.6299787005*b);
+  return[(.2104542553*l+.793617785*m-.0040720468*s)*LW*100,(1.9779984951*l-2.428592205*m+.4505937099*s)*100,(.0259040371*l+.7827717662*m-.808675766*s)*100];
+}
+function render(){
+  const iw=S.img.naturalWidth,ih=S.img.naturalHeight,k0=S.res/Math.max(iw,ih);
+  const w=Math.max(1,Math.round(iw*k0)),h=Math.max(1,Math.round(ih*k0)),n=w*h;
+  const src=downscale(S.img,w,h).data;
+  const R=new Float32Array(n),G=new Float32Array(n),B=new Float32Array(n),Ls=new Float32Array(n);
+  for(let i=0;i<n;i++){R[i]=src[i*4];G[i]=src[i*4+1];B[i]=src[i*4+2];Ls[i]=.299*R[i]+.587*G[i]+.114*B[i]}
+
+  // auto levels from luminance (same stretch on all channels so hue is kept)
+  const sorted=Float32Array.from(Ls).sort();
+  let lo=sorted[Math.floor(n*.01)],hi=sorted[Math.floor(n*.99)],span=hi-lo;
+  if(span<142){lo-=(142-span)/2;span=142} // never stretch more than ~1.8x, so pale skies stay pale
+  const k=1.05+S.con/50*.9,off=S.bri/50*50,sat=1.0;
+  const f=v=>Math.min(255,Math.max(0,((v-lo)/span*225+12-128)*k+128+off));
+  for(let i=0;i<n;i++){
+    let r=f(R[i]),g=f(G[i]),b=f(B[i]);
+    const l=.299*r+.587*g+.114*b;
+    R[i]=Math.min(255,Math.max(0,l+(r-l)*sat));G[i]=Math.min(255,Math.max(0,l+(g-l)*sat));B[i]=Math.min(255,Math.max(0,l+(b-l)*sat));
+  }
+
+  const pal=colours(),np=pal.length,amt=S.dith/8;
+  const pl=pal.map(c=>lab(c[0],c[1],c[2]));
+  const nearLab=(L,A,Bb)=>{let best=0,bd=1e12;
+    for(let p=0;p<np;p++){const q=pl[p],d=(L-q[0])**2+(A-q[1])**2+(Bb-q[2])**2;if(d<bd){bd=d;best=p}}return best};
+  const idx=new Uint8Array(n);
+  if(S.mode==="fs"){
+    for(let y=0;y<h;y++){const rtl=y&1;
+      for(let t=0;t<w;t++){
+        const x=rtl?w-1-t:t,i=y*w+x,d=rtl?-1:1;
+        const v=lab(R[i],G[i],B[i]),q=nearLab(v[0],v[1],v[2]);idx[i]=q;const c=pal[q];
+        const er=(R[i]-c[0])*amt,eg=(G[i]-c[1])*amt,eb=(B[i]-c[2])*amt;
+        const sp=(j,wt)=>{R[j]+=er*wt;G[j]+=eg*wt;B[j]+=eb*wt};
+        if(x+d>=0&&x+d<w)sp(i+d,7/16);
+        if(y+1<h){if(x-d>=0&&x-d<w)sp(i+w-d,3/16);sp(i+w,5/16);if(x+d>=0&&x+d<w)sp(i+w+d,1/16)}
+      }}
+  }else{
+    // Palette-aware ordered dither: find the nearest colour, then the best partner colour and mix ratio,
+    // and let the Bayer cell decide. Gives clean two-colour checkers between neighbouring tones.
+    const gain=1/Math.max(amt,.001);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const i=y*w+x,p=lab(R[i],G[i],B[i]),a=nearLab(p[0],p[1],p[2]);
+      if(amt===0){idx[i]=a;continue}
+      const pa=pl[a];let bb=-1,bt=0,bs=Math.hypot(p[0]-pa[0],p[1]-pa[1],p[2]-pa[2]);
+      for(let q=0;q<np;q++){if(q===a)continue;
+        const pq=pl[q],vx=pq[0]-pa[0],vy=pq[1]-pa[1],vz=pq[2]-pa[2],vv=vx*vx+vy*vy+vz*vz;
+        let t=((p[0]-pa[0])*vx+(p[1]-pa[1])*vy+(p[2]-pa[2])*vz)/vv;t=t<0?0:t>1?1:t;
+        const e=Math.hypot(p[0]-pa[0]-t*vx,p[1]-pa[1]-t*vy,p[2]-pa[2]-t*vz)+.2*Math.sqrt(vv)*t;
+        if(e<bs){bs=e;bb=q;bt=t}}
+      if(bb<0){idx[i]=a;continue}
+      const te=Math.min(1,Math.max(0,.5+(bt-.5)*gain));
+      idx[i]=(BAYER[y&3][x&3]+.5<te)?bb:a;
+    }
+  }
+
+  const cv=$("cv");cv.width=w;cv.height=h;
+  const cx=cv.getContext("2d"),out=cx.createImageData(w,h);
+  for(let i=0;i<n;i++){const c=pal[idx[i]];out.data[i*4]=c[0];out.data[i*4+1]=c[1];out.data[i*4+2]=c[2];out.data[i*4+3]=255}
+  cx.putImageData(out,0,0);
+  const box=$("screen").clientWidth||600,sc=Math.max(1,Math.floor(box/w));
+  cv.style.width=Math.min(box,w*sc)+"px";cv.style.height="auto";
+  const bg=pal.slice().sort((a,b)=>(a[0]+a[1]+a[2])-(b[0]+b[1]+b[2]))[0];
+  $("screen").style.setProperty("--c0",`rgb(${bg.join(",")})`);
+}
+function paint(){if(S.img)render()}
+
+function seg(el,items,get,set){
+  el.innerHTML="";
+  items.forEach(([v,t])=>{const b=document.createElement("button");b.textContent=t;
+    b.setAttribute("aria-pressed",String(get()===v));
+    b.onclick=()=>{set(v);[...el.children].forEach((c,i)=>c.setAttribute("aria-pressed",String(items[i][0]===v)));paint()};
+    el.appendChild(b)});
+}
+const setRes=v=>{S.res=v;$("vres").textContent=v+" px"};
+function drawSegs(){
+  seg($("res"),RES.map(v=>[v,String(v)]),()=>S.res,setRes);
+  seg($("dm"),MODES,()=>S.mode,v=>S.mode=v);
+}
+function drawPals(){
+  const box=$("pals");box.innerHTML="";
+  const names=Object.keys(PALS);if(S.custom)names.push("Custom");
+  names.forEach(nm=>{
+    const b=document.createElement("button");b.className="pal";b.title=nm;b.setAttribute("aria-label",nm);
+    b.setAttribute("aria-pressed",String(S.pal===nm));
+    const cols=nm==="Custom"?S.custom.map(c=>`rgb(${c})`):PALS[nm];
+    cols.forEach(c=>{const i=document.createElement("i");i.style.background=c;b.appendChild(i)});
+    b.onclick=()=>{S.pal=nm;drawPals();paint()};
+    box.appendChild(b);
+  });
+}
+function syncInputs(){
+  $("con").value=S.con;$("bri").value=S.bri;$("dit").value=S.dith;
+  $("vc").textContent=S.con;$("vb").textContent=S.bri;$("vd").textContent=S.dith;$("vres").textContent=S.res+" px";
+}
+drawSegs();drawPals();syncInputs();
+
+$("dit").oninput=e=>{S.dith=+e.target.value;$("vd").textContent=S.dith;paint()};
+$("con").oninput=e=>{S.con=+e.target.value;$("vc").textContent=S.con;paint()};
+$("bri").oninput=e=>{S.bri=+e.target.value;$("vb").textContent=S.bri;paint()};
+$("reset").onclick=()=>{Object.assign(S,DEF);drawSegs();drawPals();syncInputs();paint()};
+
+function load(file){
+  if(!file||!file.type.startsWith("image/"))return;
+  if(S.url)URL.revokeObjectURL(S.url);
+  S.url=URL.createObjectURL(file);
+  const im=new Image();
+  im.onload=()=>{S.img=im;$("orig").src=S.url;$("empty").hidden=true;$("cv").hidden=false;
+    $("hold").disabled=false;$("save").disabled=false;$("save1").disabled=false;render()};
+  im.onerror=()=>alert("That file could not be opened as an image.");
+  im.src=S.url;
+}
+$("pick").onclick=()=>$("file").click();
+$("file").onchange=e=>{load(e.target.files[0]);e.target.value=""};
+const scr=$("screen");
+scr.ondragover=e=>e.preventDefault();
+scr.ondrop=e=>{e.preventDefault();load(e.dataTransfer.files[0])};
+scr.onclick=()=>{if(!S.img)$("file").click()};
+
+const hold=$("hold"),orig=$("orig");
+const on=()=>orig.classList.add("on"),off=()=>orig.classList.remove("on");
+hold.onpointerdown=on;hold.onpointerup=off;hold.onpointerleave=off;hold.onpointercancel=off;
+hold.onkeydown=e=>{if(e.key===" "||e.key==="Enter")on()};hold.onkeyup=off;
+
+$("cust").onclick=()=>$("pfile").click();
+$("pfile").onchange=async e=>{
+  const t=await e.target.files[0].text();e.target.value="";
+  const m=[...t.matchAll(/^\s*#?([0-9a-f]{6}|[0-9a-f]{3})\s*$/gim)].map(x=>hex(x[1])).slice(0,64);
+  if(m.length<2){alert("Add at least two colours, one hex code per line, like #1a2b3c or 1a2b3c.");return}
+  S.custom=m;S.pal="Custom";drawPals();paint();
+};
+
+function dl(c,name){c.toBlob(b=>{const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name+"_"+new Date().toISOString().replace(/[:.]/g,"-")+".png";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)},"image/png")}
+$("save1").onclick=()=>dl($("cv"),"pixless_1x");
+$("save").onclick=()=>{
+  const cv=$("cv"),s=Math.max(1,Math.round(2048/Math.max(cv.width,cv.height)));
+  const o=document.createElement("canvas");o.width=cv.width*s;o.height=cv.height*s;
+  const x=o.getContext("2d");x.imageSmoothingEnabled=false;x.drawImage(cv,0,0,o.width,o.height);
+  o.toBlob(b=>{const a=document.createElement("a");a.href=URL.createObjectURL(b);
+    a.download="pixless_"+new Date().toISOString().replace(/[:.]/g,"-")+".png";a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),2000)},"image/png");
+};
+addEventListener("resize",()=>{clearTimeout(window._r);window._r=setTimeout(paint,120)});
+</script>
+</body>
+</html>
